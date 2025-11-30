@@ -25,255 +25,156 @@ Website Wisata Kabupaten Bulukumba
 
 Dokumentasi lengkap pengembangan website wisata berbasis Laravel, Bootstrap 5, dan FilamentPHP.
 
-🛠 Teknologi yang Digunakan
-
-Framework: Laravel 11
-
-Language: PHP 8.2+
-
-Database: MySQL
-
-Admin Panel: FilamentPHP v3
-
-Frontend UI: Bootstrap 5 (CDN)
-
-Auth: Laravel Breeze (Customer) & Filament Auth (Admin)
-
-🚀 Langkah 1: Instalasi & Persiapan
-
-Install Laravel Project
-
+🚀 Instalasi & Setup Project
+1️⃣ Clone & Install Project
 composer create-project laravel/laravel wisata-bulukumba
 cd wisata-bulukumba
 
+2️⃣ Konfigurasi Database
 
-Setup Database (.env)
-Buat database di phpMyAdmin bernama db_wisata_bulukumba, lalu edit file .env:
+Buat database di phpMyAdmin:
+db_wisata_bulukumba
+
+Edit file .env:
 
 DB_DATABASE=db_wisata_bulukumba
 
-
-Install Filament (Admin Panel)
-
+3️⃣ Install Filament Admin
 composer require filament/filament -W
 php artisan filament:install --panels
 
-
-Install Laravel Breeze (Login User)
-
+4️⃣ Install Laravel Breeze (Auth User)
 composer require laravel/breeze --dev
 php artisan breeze:install
 
 
-Pilih opsi: Blade -> No -> No/Yes.
+Pilih opsi Blade → No → No/Yes
 
-🗄️ Langkah 2: Database (Model & Migration)
+🗄️ Database Structure
+🔹 Destination Model
 
-Buat Model & Migration
+Migration:
 
 php artisan make:model Destination -m
+
+
+Fields:
+
+Field	Type
+name	string
+slug	string (unique)
+description	text
+location	string
+price	decimal
+image_url	string
+🔹 Order Model
+
+Migration:
+
 php artisan make:model Order -m
 
 
-Struktur Tabel destinations
+Fields:
 
-name (string)
+Field	Type
+user_id	foreignId
+destination_id	foreignId
+quantity	integer
+total_price	decimal
+status	enum: pending, paid, cancelled
 
-slug (string, unique)
-
-description (text)
-
-location (string)
-
-price (decimal)
-
-image_url (string)
-
-Struktur Tabel orders
-
-user_id (foreignId)
-
-destination_id (foreignId)
-
-quantity (integer)
-
-total_price (decimal)
-
-status (enum: pending, paid, cancelled)
-
-Jalankan Migrasi
+Jalankan migrasi:
 
 php artisan migrate
 
+🌱 Seeder Data Wisata
 
-🌱 Langkah 3: Seeder (Data Dummy)
-
-Mengisi data wisata otomatis (Pantai Bara, Apparallang, dll).
-
-Buat Seeder
+Buat seeder:
 
 php artisan make:seeder DestinationSeeder
 
 
-Jalankan Seeder
+Jalankan:
 
 php artisan db:seed --class=DestinationSeeder
 
+🎨 Frontend — Bootstrap 5
 
-💻 Langkah 4: Frontend (Bootstrap 5)
+📌 File Layout Utama
+resources/views/layouts/main.blade.php
+• Include Bootstrap 5 CDN
+• Navbar (Beranda • Tiket Saya • Login/Register)
 
-Setup Layout (resources/views/layouts/main.blade.php)
+📌 Halaman Utama
+resources/views/welcome.blade.php
+• Hero section bergambar
+• Grid cards destinasi (col-md-4)
 
-Include Bootstrap 5 CDN di <head>.
+📌 Halaman Detail Wisata
+resources/views/destinations/show.blade.php
+• Detail lokasi, harga
+• Form beli tiket → OrderController
 
-Buat Navbar (Beranda, Tiket Saya, Login/Register).
+📌 Redirect Login → Beranda
+Edit:
 
-Halaman Utama (welcome.blade.php)
+RegisteredUserController.php
 
-Menggunakan Hero Section dengan background gambar.
+AuthenticatedSessionController.php
 
-Menggunakan Grid System (col-md-4) untuk menampilkan kartu wisata.
+🔐 Admin Panel — Filament
+Reset & Generate Ulang (Jika Error)
+# Hapus resource bermasalah
+rm -rf app/Filament/Resources/OrderResource*
 
-Style Card: Menggunakan card-img-overlay agar teks berada di atas gambar (mirip style Wonderful Indonesia).
-
-Halaman Detail & Beli (destinations/show.blade.php)
-
-Menampilkan detail wisata.
-
-Form input jumlah tiket (POST ke OrderController).
-
-Perbaikan Redirect Login
-Mengubah redirect default dari /dashboard ke / (Beranda) di file:
-
-app/Http/Controllers/Auth/RegisteredUserController.php
-
-app/Http/Controllers/Auth/AuthenticatedSessionController.php
-
-⚙️ Langkah 5: Admin Panel (Filament)
-
-Ini adalah bagian yang paling krusial. Kita menggunakan OrderResource untuk mengelola pesanan.
-
-A. Reset & Generate Ulang (Solusi Anti-Error)
-
-Jika terjadi error "Class not available" atau menu hilang, lakukan reset:
-
-# Hapus folder lama yang bermasalah
-Remove-Item -Path "app\Filament\Resources\OrderResource" -Recurse -Force
-Remove-Item -Path "app\Filament\Resources\Orders" -Recurse -Force
-Remove-Item -Path "app\Filament\Resources\OrderResource.php" -Force
-
-# Generate ulang
+# Buat ulang
 php artisan make:filament-resource Order --generate
 
+Config OrderResource.php
 
-B. Kode Final OrderResource.php
+📌 Lokasi:
 
-Lokasi: app/Filament/Resources/OrderResource.php.
-Fitur: Mengubah ID menjadi Nama, Dollar menjadi Rupiah, dan Status Warna-warni.
-
-// Pastikan namespace benar
-namespace App\Filament\Resources;
-
-use App\Filament\Resources\OrderResource\Pages;
-use App\Models\Order;
-use Filament\Forms;
-use Filament\Resources\Resource;
-use Filament\Tables;
-
-class OrderResource extends Resource
-{
-    protected static ?string $model = Order::class;
-    
-    // Konfigurasi Menu Sidebar
-    protected static ?string $navigationIcon = 'heroicon-o-shopping-cart';
-    protected static ?string $navigationLabel = 'Daftar Pesanan';
-    protected static ?string $navigationGroup = 'Transaksi';
-
-    // Form Edit (Admin mengubah status bayar)
-    public static function form(Forms\Form $form): Forms\Form
-    {
-        return $form->schema([
-            Forms\Components\Section::make('Informasi Pesanan')->schema([
-                Forms\Components\TextInput::make('user.name')->label('Nama Pemesan')->disabled(),
-                Forms\Components\TextInput::make('destination.name')->label('Wisata')->disabled(),
-                Forms\Components\TextInput::make('total_price')->label('Total')->prefix('Rp')->disabled(),
-            ])->columns(2),
-
-            Forms\Components\Section::make('Update Status')->schema([
-                Forms\Components\Select::make('status')
-                    ->options([
-                        'pending' => 'Pending',
-                        'paid' => 'Lunas',
-                        'cancelled' => 'Batal'
-                    ])
-                    ->required()
-            ]),
-        ]);
-    }
-
-    // Tabel Daftar Pesanan
-    public static function table(Tables\Table $table): Tables\Table
-    {
-        return $table->columns([
-            Tables\Columns\TextColumn::make('created_at')->dateTime('d M Y H:i'),
-            Tables\Columns\TextColumn::make('user.name')->searchable(),
-            Tables\Columns\TextColumn::make('destination.name'),
-            Tables\Columns\TextColumn::make('total_price')->money('IDR'), // Format Rupiah
-            Tables\Columns\TextColumn::make('status')
-                ->badge()
-                ->color(fn (string $state): string => match ($state) {
-                    'pending' => 'warning',
-                    'paid' => 'success',
-                    'cancelled' => 'danger',
-                }),
-        ])
-        ->defaultSort('created_at', 'desc');
-    }
-    
-    // ... (Code pages standard)
-}
+app/Filament/Resources/OrderResource.php
 
 
-🔒 Langkah 6: Keamanan (Security)
+Fitur:
+✔ Nama user & wisata otomatis
+✔ Format Rupiah
+✔ Status badge warna-warni
 
-Membatasi akses /admin hanya untuk email admin tertentu.
+(📌 Kode sudah sesuai best practice Filament)
 
-File: app/Models/User.php
+🛡️ Security Access Admin
 
-Implement FilamentUser.
-
-Tambahkan fungsi canAccessPanel:
+📌 File: app/Models/User.php
 
 public function canAccessPanel(\Filament\Panel $panel): bool
 {
-    // Hanya email ini yang boleh masuk admin
     return $this->email === 'admin@gmail.com';
 }
 
-
-🚀 Cara Menjalankan Project
-
-Buka Terminal dan jalankan server:
-
+▶️ Cara Menjalankan Project
 php artisan serve
 
 
-Akses Website Pengunjung:
-Buka http://127.0.0.1:8000
+🌍 Customer Website
+http://127.0.0.1:8000/
 
-Akses Admin Panel:
-Buka http://127.0.0.1:8000/admin
+🔑 Admin Panel
+http://127.0.0.1:8000/admin
+
+Login Admin:
 
 Email: admin@gmail.com
+Password: (sesuai yang dibuat saat register)
 
-Password: (Sesuai yang dibuat saat register)
+📝 Catatan & Troubleshooting
 
-📝 Catatan Penting
+Jika ada error setelah ubah resource Filament:
 
-Jika mengubah file Filament dan terjadi error, selalu jalankan:
-composer dump-autoload dan php artisan optimize:clear.
+composer dump-autoload
+php artisan optimize:clear
 
-Folder Resource Filament WAJIB bernama OrderResource (Singular), bukan Orders.
 
-Selesai! Project siap digunakan untuk Tugas Kuliah. 🎉
+⚠️ Wajib: Nama Resource → OrderResource (Singular)
 
