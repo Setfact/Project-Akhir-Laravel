@@ -21,39 +21,146 @@ Laravel is a web application framework with expressive, elegant syntax. We belie
 
 Laravel is accessible, powerful, and provides tools required for large, robust applications.
 
-## Learning Laravel
+🏖️ Wisata Bulukumba - Sistem Pemesanan Tiket WisataProject website untuk Dinas Pariwisata Kabupaten Bulukumba. Website ini memungkinkan pengunjung melihat destinasi wisata, memesan tiket, dan Admin dapat mengelola pesanan melalui dashboard modern.🛠️ Tech StackFramework: Laravel 11Language: PHP 8.2+Database: MySQLAdmin Panel: FilamentPHP v3Frontend: Bootstrap 5 + Blade TemplatesAuth: Laravel Breeze (Customer) & Filament Auth (Admin)🚀 Langkah Instalasi & Setup (Versi Anti-Error)Ikuti langkah ini secara berurutan untuk menghindari konflik versi atau error folder.1. Instalasi Dasar# 1. Buat Project Laravel Baru
+composer create-project laravel/laravel wisata-bulukumba
+cd wisata-bulukumba
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework. You can also check out [Laravel Learn](https://laravel.com/learn), where you will be guided through building a modern Laravel application.
+# 2. Setup Database (.env)
+# Pastikan buat database kosong bernama 'db_wisata_bulukumba' di phpMyAdmin
+# Lalu edit file .env:
+# DB_DATABASE=db_wisata_bulukumba
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+# 3. Install Filament (Gunakan flag -W agar versi kompatibel)
+composer require filament/filament -W
+php artisan filament:install --panels
 
-## Laravel Sponsors
+# 4. Install Laravel Breeze (Pilih: Blade -> No -> No/Yes)
+composer require laravel/breeze --dev
+php artisan breeze:install
+2. Database MigrationBuat tabel destinations dan orders.Edit file migration di database/migrations/:Tabel Destinations:Schema::create('destinations', function (Blueprint $table) {
+    $table->id();
+    $table->string('name');
+    $table->string('slug')->unique();
+    $table->text('description');
+    $table->string('location');
+    $table->decimal('price', 12, 2);
+    $table->string('image_url')->nullable();
+    $table->timestamps();
+});
+Tabel Orders:Schema::create('orders', function (Blueprint $table) {
+    $table->id();
+    $table->foreignId('user_id')->constrained()->cascadeOnDelete();
+    $table->foreignId('destination_id')->constrained()->cascadeOnDelete();
+    $table->integer('quantity');
+    $table->decimal('total_price', 12, 2);
+    $table->enum('status', ['pending', 'paid', 'cancelled'])->default('pending');
+    $table->string('payment_proof')->nullable();
+    $table->timestamps();
+});
+Llalu jalankan: php artisan migrate👮‍♂️ Konfigurasi Admin (Filament)Ini adalah bagian krusial. Ikuti kode di bawah ini agar tidak terjadi error "Class not found" atau masalah tampilan.1. Buat Resource (Otomatis)Jangan buat manual! Biarkan Laravel yang generate foldernya.php artisan make:filament-resource Destination
+php artisan make:filament-resource Order --generate
+2. Setup OrderResource.php (Versi Final)Lokasi: app/Filament/Resources/OrderResource.phpKode ini sudah memperbaiki masalah Import Class, Format Rupiah, dan Nama User.<?php
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+namespace App\Filament\Resources;
 
-### Premium Partners
+use App\Filament\Resources\OrderResource\Pages;
+use App\Models\Order;
+use Filament\Forms;
+use Filament\Resources\Resource;
+use Filament\Tables;
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
+class OrderResource extends Resource
+{
+    protected static ?string $model = Order::class;
+    protected static ?string $navigationIcon = 'heroicon-o-shopping-cart';
+    protected static ?string $navigationLabel = 'Daftar Pesanan';
+    protected static ?string $navigationGroup = 'Transaksi';
 
-## Contributing
+    public static function form(Forms\Form $form): Forms\Form
+    {
+        return $form
+            ->schema([
+                Forms\Components\Section::make('Informasi Pesanan')
+                    ->schema([
+                        Forms\Components\TextInput::make('user.name')->label('Nama Pemesan')->disabled(),
+                        Forms\Components\TextInput::make('destination.name')->label('Wisata Tujuan')->disabled(),
+                        Forms\Components\TextInput::make('quantity')->label('Jumlah Tiket')->disabled(),
+                        Forms\Components\TextInput::make('total_price')->label('Total Bayar')->prefix('Rp')->disabled(),
+                    ])->columns(2),
+                Forms\Components\Section::make('Update Status')
+                    ->schema([
+                        Forms\Components\Select::make('status')
+                            ->label('Status Pembayaran')
+                            ->options([
+                                'pending' => 'Pending (Belum Bayar)',
+                                'paid' => 'Paid (Lunas)',
+                                'cancelled' => 'Cancelled (Batal)',
+                            ])
+                            ->required(),
+                    ]),
+            ]);
+    }
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+    public static function table(Tables\Table $table): Tables\Table
+    {
+        return $table
+            ->columns([
+                Tables\Columns\TextColumn::make('created_at')->dateTime('d M Y H:i')->label('Tanggal'),
+                Tables\Columns\TextColumn::make('user.name')->label('Pemesan')->searchable(),
+                Tables\Columns\TextColumn::make('destination.name')->label('Wisata'),
+                Tables\Columns\TextColumn::make('total_price')->money('IDR')->label('Total'),
+                Tables\Columns\TextColumn::make('status')
+                    ->badge()
+                    ->color(fn (string $state): string => match ($state) {
+                        'pending' => 'warning',
+                        'paid' => 'success',
+                        'cancelled' => 'danger',
+                    }),
+            ])
+            ->defaultSort('created_at', 'desc')
+            ->actions([ Tables\Actions\EditAction::make() ]);
+    }
+    
+    public static function getRelations(): array { return []; }
+    public static function getPages(): array {
+        return [
+            'index' => Pages\ListOrders::route('/'),
+            'create' => Pages\CreateOrder::route('/create'),
+            'edit' => Pages\EditOrder::route('/{record}/edit'),
+        ];
+    }
+}
+3. Batasi Akses Admin (Security)Agar hanya email tertentu yang bisa login ke Admin Panel.Edit app/Models/User.php:use Filament\Models\Contracts\FilamentUser;
+use Filament\Panel;
 
-## Code of Conduct
+class User extends Authenticatable implements FilamentUser
+{
+    // ... code lain ...
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+    public function canAccessPanel(Panel $panel): bool
+    {
+        return $this->email === 'admin@gmail.com'; // Ganti dengan email admin Anda
+    }
+}
+🎨 Setup Frontend (Bootstrap 5)1. Routing & ControllerBuat FrontController dan OrderController lalu atur route di routes/web.php.Fix Redirect: Pastikan di AuthenticatedSessionController.php (Login) dan RegisteredUserController.php (Register), redirect diarahkan ke route('home'), bukan dashboard.2. Tampilan (Blade)Layout Utama: Gunakan Bootstrap 5 CDN di layouts/main.blade.php.Homepage (welcome.blade.php): Gunakan Grid System (col-md-4) untuk menampilkan kartu wisata agar responsif 3 kolom.Contoh Grid Card Destinasi:<div class="col-12 col-md-4 mb-4">
+    <div class="card border-0 shadow-sm h-100 text-white">
+        <img src="{{ $dest->image_url }}" class="card-img" style="height: 350px; object-fit: cover;">
+        <div class="card-img-overlay d-flex align-items-end">
+            <div>
+                <h5 class="fw-bold">{{ $dest->name }}</h5>
+                <small>Rp {{ number_format($dest->price) }}</small>
+            </div>
+        </div>
+    </div>
+</div>
+🧪 Cara Menjalankan ProjectGenerate Data Dummy (Seeder):php artisan make:seeder DestinationSeeder
+# (Isi data Pantai Bara, Apparallang, dll)
+php artisan db:seed --class=DestinationSeeder
+Buat Akun Admin:php artisan make:filament-user
+# Name: Admin
+# Email: admin@gmail.com (Wajib sama dengan di User Model)
+# Password: password
+Jalankan Server:php artisan optimize:clear
+php artisan serve
+Akses:Pengunjung: http://127.0.0.1:8000Admin Panel: http://127.0.0.1:8000/admin📝 Catatan PentingJika menu Admin hilang atau terjadi error Class not available, jalankan perintah composer dump-autoload dan php artisan optimize:clear.Sistem pembayaran menggunakan metode Manual Transfer (User upload bukti -> Admin set status 'Paid' manual).Dibuat untuk Tugas Kuliah - Wisata BulukumbaSelamat Coding! 🚀
 
-## Security Vulnerabilities
-
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
-
-## License
-
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
